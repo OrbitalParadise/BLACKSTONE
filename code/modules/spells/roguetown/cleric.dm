@@ -55,6 +55,18 @@
 			continue
 		H.mind.AddSpell(new spell)
 
+/datum/devotion/cleric_holder/proc/grant_spells_templar(mob/living/carbon/human/H)
+	if(!H || !H.mind)
+		return
+
+	var/datum/patrongods/A = H.PATRON
+	var/spelllist = list(/obj/effect/proc_holder/spell/targeted/churn, A.t0)
+	level = CLERIC_T0
+	for(var/spell in spelllist)
+		if(H.mind.has_spell(spell))
+			continue
+		H.mind.AddSpell(new spell)
+
 // General
 /obj/effect/proc_holder/spell/invoked/lesser_heal
 	name = "Lesser Miracle"
@@ -88,7 +100,7 @@
 			if(affecting)
 				if(affecting.heal_damage(20, 20, 0, null, FALSE))
 					C.update_damage_overlays()
-				if(affecting.heal_wounds(50))
+				if(affecting.heal_wounds(10))
 					C.update_damage_overlays()
 		else
 			target.adjustBruteLoss(-5)
@@ -136,7 +148,7 @@
 			if(affecting)
 				if(affecting.heal_damage(50, 50, 0, null, FALSE))
 					C.update_damage_overlays()
-				if(affecting.heal_wounds(50))
+				if(affecting.heal_wounds(20))
 					C.update_damage_overlays()
 		else
 			target.adjustBruteLoss(-50)
@@ -338,7 +350,7 @@
 		var/mob/living/target = targets[1]
 		if(target == user)
 			return FALSE
-		var/was_zombie = target.mind?.has_antag_datum(/datum/antagonist/zombie)
+		var/datum/antagonist/zombie/was_zombie = target.mind?.has_antag_datum(/datum/antagonist/zombie)
 		var/has_rot = was_zombie
 		if(!has_rot && iscarbon(target))
 			var/mob/living/carbon/stinky = target
@@ -355,6 +367,8 @@
 			S.AOE_flash(user, range = 8)
 		testing("curerot2")
 		if(was_zombie)
+			if(was_zombie.become_rotman && prob(5)) //5% chance to NOT become a rotman
+				was_zombie.become_rotman = FALSE
 			target.mind.remove_antag_datum(/datum/antagonist/zombie)
 			target.Unconscious(20 SECONDS)
 			target.emote("breathgasp")
@@ -362,6 +376,9 @@
 			if(unzombification_pq && !HAS_TRAIT(target, TRAIT_IWASUNZOMBIFIED) && user?.ckey)
 				adjust_playerquality(unzombification_pq, user.ckey)
 				ADD_TRAIT(target, TRAIT_IWASUNZOMBIFIED, "[type]")
+		var/datum/component/rot/rot = target.GetComponent(/datum/component/rot)
+		if(rot)
+			rot.amount = 0
 		if(iscarbon(target))
 			var/mob/living/carbon/stinky = target
 			for(var/obj/item/bodypart/rotty in stinky.bodyparts)
@@ -370,7 +387,10 @@
 				rotty.update_limb()
 				rotty.update_disabled()
 		target.update_body()
-		target.visible_message("<span class='notice'>The rot leaves [target]'s body!</span>", "<span class='green'>I feel the rot leave my body!</span>")
+		if(!HAS_TRAIT(target, TRAIT_ROTMAN))
+			target.visible_message("<span class='notice'>The rot leaves [target]'s body!</span>", "<span class='green'>I feel the rot leave my body!</span>")
+		else
+			target.visible_message("<span class='warning'>The rot fails to leave [target]'s body!</span>", "<span class='warning'>I feel no different...</span>")
 		return TRUE
 	return FALSE
 
@@ -426,7 +446,7 @@
 	cast_without_targets = TRUE
 	sound = 'sound/magic/churn.ogg'
 	associated_skill = /datum/skill/magic/holy
-	invocation = "The Undermaiden rubukes!"
+	invocation = "The Undermaiden rebukes!"
 	invocation_type = "shout" //can be none, whisper, emote and shout
 	miracle = TRUE
 	devotion_cost = -60
@@ -492,10 +512,10 @@
 	var/pickedsoul = input(user, "Which soul should I commune with?", "Available Souls") as null|anything in souloptions
 	if(!pickedsoul)
 		return
-	for(var/mob/living/carbon/spirit/P in GLOB.mob_list)
+	for(var/mob/living/carbon/spirit/P in GLOB.carbon_list)
 		if(P.livingname == pickedsoul)
 			to_chat(P, "You feel yourself being pulled out of the underworld.")
-			sleep(20)
+			sleep(2 SECONDS)
 			P.loc = user.loc
 			capturedsoul = P
 			P.invisibility = INVISIBILITY_OBSERVER
@@ -510,7 +530,7 @@
 			break
 		to_chat(P, "[itemstorestore]")
 	if(capturedsoul)
-		spawn(1200)
+		spawn(2 MINUTES)
 			to_chat(user, "The soul returns to the underworld.")
 			to_chat(capturedsoul, "You feel yourself being pulled back to the underworld.")
 			for(var/obj/effect/landmark/underworld/A in GLOB.landmarks_list)
